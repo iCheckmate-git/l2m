@@ -318,6 +318,7 @@ body::before {
   overflow: auto;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.06);
+  -webkit-overflow-scrolling: touch;
 }
 
 .ledger-table {
@@ -358,6 +359,15 @@ body::before {
   margin-top: 8px;
   color: var(--muted);
   font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.ledger-title-cell {
+  font-weight: 600;
+}
+
+.ledger-action-cell {
+  text-align: right;
 }
 
 .type-badge {
@@ -544,18 +554,33 @@ body::before {
 @media (max-width: 720px) {
   .app-shell {
     width: min(100% - 20px, 1440px);
-    padding-top: 20px;
+    padding-top: 14px;
   }
 
-  .hero__copy,
   .hero__metrics,
   .card {
-    padding: 16px;
+    padding: 14px;
     border-radius: 18px;
   }
 
   .hero__metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .metric-card {
+    min-height: 96px;
+    padding: 12px;
+  }
+
+  .metric-card__value {
+    margin-top: 12px;
+    font-size: 1.1rem;
+  }
+
+  .metric-card__hint {
+    font-size: 0.76rem;
   }
 
   .transaction-form {
@@ -571,15 +596,185 @@ body::before {
   .card__header {
     align-items: start;
     flex-direction: column;
+    margin-bottom: 14px;
+  }
+
+  .card h2 {
+    font-size: 1.1rem;
+  }
+
+  .filters {
+    width: calc(100% + 4px);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    margin-right: -4px;
+  }
+
+  .filter-chip {
+    flex: 0 0 auto;
   }
 
   .chart-stage {
     height: 280px;
   }
+
+  .legend {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .insight-card__value {
+    font-size: 0.96rem;
+  }
 }
 
 @media (max-width: 560px) {
+  body::before,
+  .background-glow {
+    display: none;
+  }
+
+  .app-shell {
+    width: min(100% - 14px, 1440px);
+    padding: 10px 0 18px;
+  }
+
   .hero__metrics {
     grid-template-columns: 1fr;
+    border-radius: 16px;
+    padding: 12px;
+  }
+
+  .metric-card {
+    min-height: auto;
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .metric-card__value {
+    font-size: 1rem;
+  }
+
+  .layout,
+  .panel {
+    gap: 12px;
+  }
+
+  .card {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .status-pill {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .transaction-form {
+    gap: 12px;
+  }
+
+  .transaction-form input,
+  .transaction-form select,
+  .transaction-form textarea,
+  .button-primary {
+    min-height: 46px;
+  }
+
+  .table-wrap {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .ledger-table {
+    min-width: 0;
+    background: transparent;
+  }
+
+  .ledger-table thead {
+    display: none;
+  }
+
+  .ledger-table,
+  .ledger-table tbody,
+  .ledger-table tr,
+  .ledger-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .ledger-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .ledger-table tbody tr {
+    padding: 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .ledger-table tbody tr:hover {
+    transform: none;
+  }
+
+  .ledger-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    text-align: right;
+  }
+
+  .ledger-table td:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .ledger-table td::before {
+    content: attr(data-label);
+    flex: 0 0 88px;
+    color: var(--muted);
+    font-size: 0.74rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: left;
+  }
+
+  .ledger-table td:first-child {
+    display: block;
+    text-align: left;
+  }
+
+  .ledger-table td:first-child::before {
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .ledger-action-cell {
+    justify-content: flex-end;
+  }
+
+  .ledger-action-cell::before {
+    margin-right: auto;
+  }
+
+  .chart-stage {
+    height: 220px;
+    padding: 10px;
+  }
+
+  .legend__item {
+    font-size: 0.86rem;
+  }
+
+  .insights {
+    gap: 8px;
   }
 }

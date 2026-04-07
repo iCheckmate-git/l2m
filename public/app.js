@@ -109,16 +109,16 @@ function renderTable() {
       : '<span class="money-pill">-</span>';
 
     return `
-      <tr>
-        <td>
+      <tr class="ledger-row">
+        <td data-label="Дата">
           <strong>${formatDate(item.createdAt)}</strong>
           <div class="table-note">${escapeHtml(item.notes || 'Без комментария')}</div>
         </td>
-        <td><span class="type-badge type-badge--${item.type}">${typeLabels[item.type]}</span></td>
-        <td>${escapeHtml(item.title)}</td>
-        <td><span class="crystal-pill">${formatCrystals(item.crystals)}</span></td>
-        <td>${moneyContent}</td>
-        <td>
+        <td data-label="Тип"><span class="type-badge type-badge--${item.type}">${typeLabels[item.type]}</span></td>
+        <td data-label="Операция" class="ledger-title-cell">${escapeHtml(item.title)}</td>
+        <td data-label="Кристаллы"><span class="crystal-pill">${formatCrystals(item.crystals)}</span></td>
+        <td data-label="Реал">${moneyContent}</td>
+        <td data-label="Действие" class="ledger-action-cell">
           <button class="delete-button" data-id="${item.id}" title="Удалить запись">x</button>
         </td>
       </tr>
@@ -266,10 +266,10 @@ function renderChart() {
   chartCanvas.height = height;
   const ctx = chartCanvas.getContext('2d');
   const padding = {
-    top: 32 * dpr,
-    right: 28 * dpr,
-    bottom: 48 * dpr,
-    left: 36 * dpr
+    top: (window.innerWidth < 560 ? 24 : 32) * dpr,
+    right: (window.innerWidth < 560 ? 14 : 28) * dpr,
+    bottom: (window.innerWidth < 560 ? 42 : 48) * dpr,
+    left: (window.innerWidth < 560 ? 22 : 36) * dpr
   };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
@@ -301,7 +301,7 @@ function renderChart() {
       drawBar(ctx, x + barWidth + step * 0.1, padding.top + chartHeight - expenseHeight, barWidth, expenseHeight, ['#ff9aac', '#ff5b66']);
 
       ctx.fillStyle = 'rgba(151, 166, 193, 0.8)';
-      ctx.font = `${12 * dpr}px Manrope`;
+      ctx.font = `${(window.innerWidth < 560 ? 10 : 12) * dpr}px Manrope`;
       ctx.textAlign = 'center';
       ctx.fillText(item.label, x + barWidth, padding.top + chartHeight + 26 * dpr);
     });
@@ -339,7 +339,7 @@ function renderChart() {
 
     linePoints.forEach((point) => {
       ctx.beginPath();
-      ctx.arc(point.x, point.y, 5 * dpr, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, (window.innerWidth < 560 ? 3.5 : 5) * dpr, 0, Math.PI * 2);
       ctx.fillStyle = '#ffe2b4';
       ctx.fill();
       ctx.strokeStyle = '#ffb357';
@@ -377,6 +377,7 @@ function traceSmoothPath(ctx, points) {
 }
 
 function drawChartGrid(ctx, width, height, padding, chartHeight, chartWidth, dpr) {
+  const compact = window.innerWidth < 560;
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
   ctx.lineWidth = 1;
 
@@ -395,10 +396,10 @@ function drawChartGrid(ctx, width, height, padding, chartHeight, chartWidth, dpr
   ctx.stroke();
 
   ctx.fillStyle = 'rgba(151, 166, 193, 0.62)';
-  ctx.font = `${12 * dpr}px Manrope`;
-  ctx.fillText('7 дней', width - padding.right - 46 * dpr, padding.top - 10 * dpr);
-  ctx.fillText('Кристаллы', padding.left, padding.top - 10 * dpr);
-  ctx.fillText('Баланс', padding.left + chartWidth - 44 * dpr, padding.top - 10 * dpr);
+  ctx.font = `${(compact ? 10 : 12) * dpr}px Manrope`;
+  ctx.fillText('7 дней', width - padding.right - (compact ? 38 : 46) * dpr, padding.top - 10 * dpr);
+  ctx.fillText('CR', padding.left, padding.top - 10 * dpr);
+  ctx.fillText('Баланс', padding.left + chartWidth - (compact ? 34 : 44) * dpr, padding.top - 10 * dpr);
 }
 
 function drawBar(ctx, x, y, width, height, colors) {

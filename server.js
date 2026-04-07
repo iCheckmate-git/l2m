@@ -14,6 +14,7 @@ const dataDir = process.env.DATA_DIR
 const dbPath = path.join(dataDir, 'ledger.db');
 const host = process.env.HOST || '0.0.0.0';
 const port = Number(process.env.PORT || 3000);
+const shouldSeedDemoData = process.env.SEED_DEMO_DATA === 'true';
 
 mkdirSync(dataDir, { recursive: true });
 
@@ -44,7 +45,9 @@ const listTransactionsStmt = db.prepare(`
 const deleteTransactionStmt = db.prepare('DELETE FROM transactions WHERE id = ?');
 const countTransactionsStmt = db.prepare('SELECT COUNT(*) AS total FROM transactions');
 
-seedData();
+if (shouldSeedDemoData) {
+  seedData();
+}
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
