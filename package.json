@@ -1,0 +1,9 @@
+{
+  "name": "l2m-crystal-ledger",
+  "version": "1.0.0",
+  "description": "Mini app for tracking Lineage 2M crystal income, expense, and real-money purchases.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

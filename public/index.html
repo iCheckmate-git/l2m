@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lineage 2M Crystal Ledger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="background-glow background-glow--left"></div>
+    <div class="background-glow background-glow--right"></div>
+
+    <div class="app-shell">
+      <header class="hero">
+        <div class="hero__metrics" id="metricCards"></div>
+      </header>
+
+      <main class="layout">
+        <section class="panel panel--left">
+          <div class="card card--form">
+            <div class="card__header">
+              <div>
+                <p class="card__eyebrow">Новая запись</p>
+                <h2>Добавить движение кристаллов</h2>
+              </div>
+              <div class="status-pill">
+                <span class="status-dot"></span>
+                База данных активна
+              </div>
+            </div>
+
+            <form id="transactionForm" class="transaction-form">
+              <label>
+                Тип операции
+                <select name="type" id="typeField" required>
+                  <option value="income">Приход</option>
+                  <option value="expense">Расход</option>
+                  <option value="purchase">Покупка за реальные деньги</option>
+                </select>
+              </label>
+
+              <label>
+                Название
+                <input
+                  type="text"
+                  name="title"
+                  placeholder="Например: Raid reward"
+                  minlength="2"
+                  required
+                />
+              </label>
+
+              <label>
+                Кристаллы
+                <input
+                  type="number"
+                  name="crystals"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                  required
+                />
+              </label>
+
+              <label id="realAmountField" class="is-hidden">
+                Сумма реальных денег
+                <input
+                  type="number"
+                  name="realAmount"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                />
+              </label>
+
+              <label id="currencyField" class="is-hidden">
+                Валюта
+                <input
+                  type="text"
+                  name="realCurrency"
+                  maxlength="6"
+                  placeholder="USD"
+                  value="USD"
+                />
+              </label>
+
+              <label>
+                Дата
+                <input type="datetime-local" name="createdAt" />
+              </label>
+
+              <label class="transaction-form__notes">
+                Комментарий
+                <textarea
+                  name="notes"
+                  rows="3"
+                  placeholder="Короткая заметка о событии"
+                ></textarea>
+              </label>
+
+              <button type="submit" class="button-primary">Сохранить запись</button>
+            </form>
+          </div>
+
+          <div class="card card--table">
+            <div class="card__header card__header--dense">
+              <div>
+                <p class="card__eyebrow">История операций</p>
+                <h2>Таблица движения ресурсов</h2>
+              </div>
+
+              <div class="filters" id="filters">
+                <button class="filter-chip is-active" data-filter="all">Все</button>
+                <button class="filter-chip" data-filter="income">Приход</button>
+                <button class="filter-chip" data-filter="expense">Расход</button>
+                <button class="filter-chip" data-filter="purchase">Покупка</button>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table class="ledger-table">
+                <thead>
+                  <tr>
+                    <th>Дата</th>
+                    <th>Тип</th>
+                    <th>Операция</th>
+                    <th>Кристаллы</th>
+                    <th>Реал</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="transactionTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <aside class="panel panel--right">
+          <div class="card card--chart">
+            <div class="card__header">
+              <div>
+                <p class="card__eyebrow">Диаграмма активности</p>
+                <h2>Динамика за 7 дней</h2>
+              </div>
+            </div>
+
+            <div class="chart-stage">
+              <canvas id="activityChart" width="640" height="420"></canvas>
+            </div>
+
+            <div class="legend">
+              <div class="legend__item">
+                <span class="legend__mark legend__mark--income"></span>
+                Приход и покупка
+              </div>
+              <div class="legend__item">
+                <span class="legend__mark legend__mark--expense"></span>
+                Расход
+              </div>
+              <div class="legend__item">
+                <span class="legend__mark legend__mark--balance"></span>
+                Баланс
+              </div>
+            </div>
+          </div>
+
+          <div class="card card--insights">
+            <div class="card__header card__header--dense">
+              <div>
+                <p class="card__eyebrow">Сводка</p>
+                <h2>Быстрые показатели</h2>
+              </div>
+            </div>
+
+            <div class="insights" id="insights"></div>
+          </div>
+        </aside>
+      </main>
+    </div>
+
+    <template id="metricCardTemplate">
+      <article class="metric-card">
+        <p class="metric-card__label"></p>
+        <strong class="metric-card__value"></strong>
+        <span class="metric-card__hint"></span>
+      </article>
+    </template>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
