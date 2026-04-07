@@ -4,6 +4,9 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import pg from 'pg';
+
+const { Pool } = pg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,39 +18,8 @@ const dbPath = path.join(dataDir, 'ledger.db');
 const host = process.env.HOST || '0.0.0.0';
 const port = Number(process.env.PORT || 3000);
 const shouldSeedDemoData = process.env.SEED_DEMO_DATA === 'true';
-
-mkdirSync(dataDir, { recursive: true });
-
-const db = new DatabaseSync(dbPath);
-db.exec(`
-  PRAGMA journal_mode = WAL;
-  CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'purchase')),
-    title TEXT NOT NULL,
-    crystals INTEGER NOT NULL CHECK (crystals >= 0),
-    real_amount REAL NOT NULL DEFAULT 0 CHECK (real_amount >= 0),
-    real_currency TEXT NOT NULL DEFAULT 'USD',
-    notes TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL
-  );
-`);
-
-const insertTransactionStmt = db.prepare(`
-  INSERT INTO transactions (type, title, crystals, real_amount, real_currency, notes, created_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?)
-`);
-const listTransactionsStmt = db.prepare(`
-  SELECT id, type, title, crystals, real_amount, real_currency, notes, created_at
-  FROM transactions
-  ORDER BY datetime(created_at) DESC, id DESC
-`);
-const deleteTransactionStmt = db.prepare('DELETE FROM transactions WHERE id = ?');
-const countTransactionsStmt = db.prepare('SELECT COUNT(*) AS total FROM transactions');
-
-if (shouldSeedDemoData) {
-  seedData();
-}
+const databaseUrl = process.env.DATABASE_URL || '';
+const databaseMode = databaseUrl ? 'postgres' : 'sqlite';
 
 const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
@@ -61,37 +33,34 @@ const mimeTypes = {
   '.ico': 'image/x-icon'
 };
 
+let storage;
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || '/', `http://${req.headers.host || `${host}:${port}`}`);
 
     if (url.pathname === '/api/transactions' && req.method === 'GET') {
+      const transactions = await storage.listTransactions();
       return sendJson(res, 200, {
-        transactions: listTransactions(),
-        summary: buildSummary()
+        transactions,
+        summary: buildSummary(transactions)
       });
     }
 
     if (url.pathname === '/api/summary' && req.method === 'GET') {
-      return sendJson(res, 200, buildSummary());
+      const transactions = await storage.listTransactions();
+      return sendJson(res, 200, buildSummary(transactions));
     }
 
     if (url.pathname === '/api/transactions' && req.method === 'POST') {
       const payload = await readJson(req);
       const transaction = validateTransaction(payload);
-      const result = insertTransactionStmt.run(
-        transaction.type,
-        transaction.title,
-        transaction.crystals,
-        transaction.realAmount,
-        transaction.realCurrency,
-        transaction.notes,
-        transaction.createdAt
-      );
+      const id = await storage.insertTransaction(transaction);
+      const transactions = await storage.listTransactions();
 
       return sendJson(res, 201, {
-        id: Number(result.lastInsertRowid),
-        summary: buildSummary()
+        id,
+        summary: buildSummary(transactions)
       });
     }
 
@@ -101,16 +70,20 @@ const server = createServer(async (req, res) => {
         return sendJson(res, 400, { error: 'Invalid transaction id.' });
       }
 
-      const result = deleteTransactionStmt.run(id);
-      if (!result.changes) {
+      const deletedCount = await storage.deleteTransaction(id);
+      if (!deletedCount) {
         return sendJson(res, 404, { error: 'Transaction not found.' });
       }
 
-      return sendJson(res, 200, { ok: true, summary: buildSummary() });
+      const transactions = await storage.listTransactions();
+      return sendJson(res, 200, { ok: true, summary: buildSummary(transactions) });
     }
 
     if (url.pathname === '/api/health') {
-      return sendJson(res, 200, { ok: true });
+      return sendJson(res, 200, {
+        ok: true,
+        databaseMode
+      });
     }
 
     return serveStatic(url.pathname, res);
@@ -122,12 +95,157 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(port, host, () => {
-  console.log(`Lineage 2M ledger is running at http://${host}:${port}`);
-});
+bootstrap();
 
-function seedData() {
-  const count = countTransactionsStmt.get().total;
+async function bootstrap() {
+  storage = databaseMode === 'postgres'
+    ? await createPostgresStorage()
+    : createSqliteStorage();
+
+  if (shouldSeedDemoData) {
+    await seedData(storage);
+  }
+
+  server.listen(port, host, () => {
+    console.log(`Lineage 2M ledger is running at http://${host}:${port}`);
+    console.log(`Database mode: ${databaseMode}`);
+  });
+}
+
+function createSqliteStorage() {
+  mkdirSync(dataDir, { recursive: true });
+
+  const db = new DatabaseSync(dbPath);
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    CREATE TABLE IF NOT EXISTS transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'purchase')),
+      title TEXT NOT NULL,
+      crystals INTEGER NOT NULL CHECK (crystals >= 0),
+      real_amount REAL NOT NULL DEFAULT 0 CHECK (real_amount >= 0),
+      real_currency TEXT NOT NULL DEFAULT 'USD',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  const insertTransactionStmt = db.prepare(`
+    INSERT INTO transactions (type, title, crystals, real_amount, real_currency, notes, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  const listTransactionsStmt = db.prepare(`
+    SELECT id, type, title, crystals, real_amount, real_currency, notes, created_at
+    FROM transactions
+    ORDER BY datetime(created_at) DESC, id DESC
+  `);
+  const deleteTransactionStmt = db.prepare('DELETE FROM transactions WHERE id = ?');
+  const countTransactionsStmt = db.prepare('SELECT COUNT(*) AS total FROM transactions');
+
+  return {
+    async countTransactions() {
+      return Number(countTransactionsStmt.get().total);
+    },
+    async listTransactions() {
+      return listTransactionsStmt.all().map(normalizeRow);
+    },
+    async insertTransaction(transaction) {
+      const result = insertTransactionStmt.run(
+        transaction.type,
+        transaction.title,
+        transaction.crystals,
+        transaction.realAmount,
+        transaction.realCurrency,
+        transaction.notes,
+        transaction.createdAt
+      );
+      return Number(result.lastInsertRowid);
+    },
+    async deleteTransaction(id) {
+      const result = deleteTransactionStmt.run(id);
+      return Number(result.changes);
+    }
+  };
+}
+
+async function createPostgresStorage() {
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: shouldUseSsl()
+      ? { rejectUnauthorized: false }
+      : undefined
+  });
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS transactions (
+      id BIGSERIAL PRIMARY KEY,
+      type TEXT NOT NULL CHECK (type IN ('income', 'expense', 'purchase')),
+      title TEXT NOT NULL,
+      crystals INTEGER NOT NULL CHECK (crystals >= 0),
+      real_amount NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (real_amount >= 0),
+      real_currency TEXT NOT NULL DEFAULT 'USD',
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL
+    );
+  `);
+
+  return {
+    async countTransactions() {
+      const result = await pool.query('SELECT COUNT(*)::int AS total FROM transactions');
+      return Number(result.rows[0].total);
+    },
+    async listTransactions() {
+      const result = await pool.query(`
+        SELECT id, type, title, crystals, real_amount, real_currency, notes, created_at
+        FROM transactions
+        ORDER BY created_at DESC, id DESC
+      `);
+      return result.rows.map(normalizeRow);
+    },
+    async insertTransaction(transaction) {
+      const result = await pool.query(
+        `
+          INSERT INTO transactions (type, title, crystals, real_amount, real_currency, notes, created_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          RETURNING id
+        `,
+        [
+          transaction.type,
+          transaction.title,
+          transaction.crystals,
+          transaction.realAmount,
+          transaction.realCurrency,
+          transaction.notes,
+          transaction.createdAt
+        ]
+      );
+      return Number(result.rows[0].id);
+    },
+    async deleteTransaction(id) {
+      const result = await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
+      return Number(result.rowCount || 0);
+    }
+  };
+}
+
+function shouldUseSsl() {
+  if (!databaseUrl) {
+    return false;
+  }
+
+  if (process.env.DATABASE_SSL === 'false') {
+    return false;
+  }
+
+  if (process.env.DATABASE_SSL === 'true') {
+    return true;
+  }
+
+  return process.env.NODE_ENV === 'production';
+}
+
+async function seedData(currentStorage) {
+  const count = await currentStorage.countTransactions();
   if (count > 0) {
     return;
   }
@@ -208,15 +326,7 @@ function seedData() {
   ];
 
   for (const item of seedTransactions) {
-    insertTransactionStmt.run(
-      item.type,
-      item.title,
-      item.crystals,
-      item.realAmount,
-      item.realCurrency,
-      item.notes,
-      item.createdAt
-    );
+    await currentStorage.insertTransaction(item);
   }
 }
 
@@ -225,10 +335,6 @@ function shiftDate(offsetDays) {
   date.setDate(date.getDate() + offsetDays);
   date.setHours(19, 30, 0, 0);
   return date.toISOString();
-}
-
-function listTransactions() {
-  return listTransactionsStmt.all().map(normalizeRow);
 }
 
 function normalizeRow(row) {
@@ -240,12 +346,12 @@ function normalizeRow(row) {
     realAmount: Number(row.real_amount),
     realCurrency: row.real_currency,
     notes: row.notes,
-    createdAt: row.created_at
+    createdAt: new Date(row.created_at).toISOString()
   };
 }
 
-function buildSummary() {
-  const transactions = listTransactions()
+function buildSummary(transactions) {
+  const sortedTransactions = transactions
     .slice()
     .sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt));
 
@@ -254,7 +360,7 @@ function buildSummary() {
   let totalPurchased = 0;
   let realSpent = 0;
 
-  for (const item of transactions) {
+  for (const item of sortedTransactions) {
     if (item.type === 'income') {
       totalIncome += item.crystals;
     }
@@ -268,9 +374,9 @@ function buildSummary() {
   }
 
   const balance = totalIncome + totalPurchased - totalExpense;
-  const chart = buildChartSeries(transactions);
-  const lastTransaction = transactions.at(-1) || null;
-  const latestPurchase = transactions.filter((item) => item.type === 'purchase').at(-1) || null;
+  const chart = buildChartSeries(sortedTransactions);
+  const lastTransaction = sortedTransactions.at(-1) || null;
+  const latestPurchase = sortedTransactions.filter((item) => item.type === 'purchase').at(-1) || null;
 
   return {
     totals: {
@@ -279,7 +385,7 @@ function buildSummary() {
       totalExpense,
       totalPurchased,
       realSpent: Number(realSpent.toFixed(2)),
-      transactionCount: transactions.length,
+      transactionCount: sortedTransactions.length,
       primaryCurrency: latestPurchase?.realCurrency || 'USD'
     },
     chart,

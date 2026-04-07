@@ -1,3 +1,4 @@
+node_modules/
 data/ledger.db
 data/ledger.db-shm
 data/ledger.db-wal
